@@ -1,4 +1,3 @@
-
 import os
 import numpy as np
 import tensorflow as tf
@@ -6,24 +5,23 @@ from tensorflow import keras
 from tensorflow.keras.utils import to_categorical
 import random
 
-
 random.seed(1618)
 np.random.seed(1618)
-#tf.set_random_seed(1618)   # Uncomment for TF1.
+# tf.set_random_seed(1618)   # Uncomment for TF1.
 tf.random.set_seed(1618)
 
-#tf.logging.set_verbosity(tf.logging.ERROR)   # Uncomment for TF1.
+# tf.logging.set_verbosity(tf.logging.ERROR)   # Uncomment for TF1.
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-ALGORITHM = "guesser"
-#ALGORITHM = "tf_net"
-#ALGORITHM = "tf_conv"
+# ALGORITHM = "guesser"
+# ALGORITHM = "tf_net"
+ALGORITHM = "tf_conv"
 
 DATASET = "mnist_d"
-#DATASET = "mnist_f"
-#DATASET = "cifar_10"
-#DATASET = "cifar_100_f"
-#DATASET = "cifar_100_c"
+# DATASET = "mnist_f"
+# DATASET = "cifar_10"
+# DATASET = "cifar_100_f"
+# DATASET = "cifar_100_c"
 
 if DATASET == "mnist_d":
     NUM_CLASSES = 10
@@ -38,14 +36,14 @@ elif DATASET == "mnist_f":
     IZ = 1
     IS = 784
 elif DATASET == "cifar_10":
-    pass                                 # TODO: Add this case.
+    pass  # TODO: Add this case.
 elif DATASET == "cifar_100_f":
-    pass                                 # TODO: Add this case.
+    pass  # TODO: Add this case.
 elif DATASET == "cifar_100_c":
-    pass                                 # TODO: Add this case.
+    pass  # TODO: Add this case.
 
 
-#=========================<Classifier Functions>================================
+# =========================<Classifier Functions>================================
 
 def guesserClassifier(xTest):
     ans = []
@@ -56,16 +54,49 @@ def guesserClassifier(xTest):
     return np.array(ans)
 
 
-def buildTFNeuralNet(x, y, eps = 6):
-    pass        #TODO: Implement a standard ANN here.
-    return None
+def buildTFNeuralNet(x, y, eps=20):
+    model = tf.keras.models.Sequential([
+        tf.keras.layers.Dense(256, activation=tf.nn.sigmoid),
+        tf.keras.layers.Dense(NUM_CLASSES, activation=tf.nn.softmax)
+    ])
+    model.compile(optimizer='Adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    model.fit(x, y, epochs=eps, batch_size=128)
+    return model
 
 
-def buildTFConvNet(x, y, eps = 10, dropout = True, dropRate = 0.2):
-    pass        #TODO: Implement a CNN here. dropout option is required.
-    return None
+def buildTFConvNet(x, y, eps=10, dropout=True, dropRate=0.2):
+    model = tf.keras.models.Sequential([
+        tf.keras.layers.Conv2D(32,
+                               kernel_size=3,
+                               activation=tf.nn.relu,
+                               input_shape=(IH, IW, IZ)),
+        tf.keras.layers.MaxPool2D(pool_size=2,
+                                  padding='valid'),
+        tf.keras.layers.Dropout(dropRate if dropout else 0.0),
+        tf.keras.layers.Conv2D(64,
+                               kernel_size=3,
+                               activation=tf.nn.relu),
+        tf.keras.layers.MaxPool2D(pool_size=2,
+                                  padding='valid'),
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(NUM_CLASSES, activation=tf.nn.softmax)
+    ])
 
-#=========================<Pipeline Functions>==================================
+    def scheduler(epoch, lr):
+        if epoch < 3:
+            return lr
+        elif epoch < 6:
+            return 0.005
+        return 0.001
+
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.01), loss='categorical_crossentropy',
+                  metrics=['accuracy'])
+    reduce_lr = tf.keras.callbacks.LearningRateScheduler(scheduler)
+    model.fit(x, y, epochs=eps, callbacks=[reduce_lr], batch_size=256)
+    return model
+
+
+# =========================<Pipeline Functions>==================================
 
 def getRawData():
     if DATASET == "mnist_d":
@@ -75,11 +106,11 @@ def getRawData():
         mnist = tf.keras.datasets.fashion_mnist
         (xTrain, yTrain), (xTest, yTest) = mnist.load_data()
     elif DATASET == "cifar_10":
-        pass      # TODO: Add this case.
+        pass  # TODO: Add this case.
     elif DATASET == "cifar_100_f":
-        pass      # TODO: Add this case.
+        pass  # TODO: Add this case.
     elif DATASET == "cifar_100_c":
-        pass      # TODO: Add this case.
+        pass  # TODO: Add this case.
     else:
         raise ValueError("Dataset not recognized.")
     print("Dataset: %s" % DATASET)
@@ -88,7 +119,6 @@ def getRawData():
     print("Shape of xTest dataset: %s." % str(xTest.shape))
     print("Shape of yTest dataset: %s." % str(yTest.shape))
     return ((xTrain, yTrain), (xTest, yTest))
-
 
 
 def preprocessData(raw):
@@ -108,11 +138,10 @@ def preprocessData(raw):
     return ((xTrainP, yTrainP), (xTestP, yTestP))
 
 
-
 def trainModel(data):
     xTrain, yTrain = data
     if ALGORITHM == "guesser":
-        return None   # Guesser has no model, as it is just guessing.
+        return None  # Guesser has no model, as it is just guessing.
     elif ALGORITHM == "tf_net":
         print("Building and training TF_NN.")
         return buildTFNeuralNet(xTrain, yTrain)
@@ -121,7 +150,6 @@ def trainModel(data):
         return buildTFConvNet(xTrain, yTrain)
     else:
         raise ValueError("Algorithm not recognized.")
-
 
 
 def runModel(data, model):
@@ -147,7 +175,6 @@ def runModel(data, model):
         raise ValueError("Algorithm not recognized.")
 
 
-
 def evalResults(data, preds):
     xTest, yTest = data
     acc = 0
@@ -159,8 +186,7 @@ def evalResults(data, preds):
     print()
 
 
-
-#=========================<Main>================================================
+# =========================<Main>================================================
 
 def main():
     raw = getRawData()
@@ -168,7 +194,6 @@ def main():
     model = trainModel(data[0])
     preds = runModel(data[1][0], model)
     evalResults(data[1], preds)
-
 
 
 if __name__ == '__main__':
