@@ -17,11 +17,11 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 # ALGORITHM = "tf_net"
 ALGORITHM = "tf_conv"
 
-DATASET = "mnist_d"
+# DATASET = "mnist_d"
 # DATASET = "mnist_f"
 # DATASET = "cifar_10"
 # DATASET = "cifar_100_f"
-# DATASET = "cifar_100_c"
+DATASET = "cifar_100_c"
 
 if DATASET == "mnist_d":
     NUM_CLASSES = 10
@@ -36,11 +36,23 @@ elif DATASET == "mnist_f":
     IZ = 1
     IS = 784
 elif DATASET == "cifar_10":
-    pass  # TODO: Add this case.
+    NUM_CLASSES = 10
+    IH = 32
+    IW = 32
+    IZ = 3
+    IS = 3072
 elif DATASET == "cifar_100_f":
-    pass  # TODO: Add this case.
+    NUM_CLASSES = 100
+    IH = 32
+    IW = 32
+    IZ = 3
+    IS = 3072
 elif DATASET == "cifar_100_c":
-    pass  # TODO: Add this case.
+    NUM_CLASSES = 20
+    IH = 32
+    IW = 32
+    IZ = 3
+    IS = 3072
 
 
 # =========================<Classifier Functions>================================
@@ -67,32 +79,47 @@ def buildTFNeuralNet(x, y, eps=20):
 def buildTFConvNet(x, y, eps=10, dropout=True, dropRate=0.2):
     model = tf.keras.models.Sequential([
         tf.keras.layers.Conv2D(32,
-                               kernel_size=3,
+                               kernel_size=(3, 3),
                                activation=tf.nn.relu,
                                input_shape=(IH, IW, IZ)),
-        tf.keras.layers.MaxPool2D(pool_size=2,
-                                  padding='valid'),
-        tf.keras.layers.Dropout(dropRate if dropout else 0.0),
-        tf.keras.layers.Conv2D(64,
-                               kernel_size=3,
+        tf.keras.layers.Conv2D(32,
+                               kernel_size=(2, 2),
                                activation=tf.nn.relu),
-        tf.keras.layers.MaxPool2D(pool_size=2,
-                                  padding='valid'),
+        tf.keras.layers.BatchNormalization(),
+
+        tf.keras.layers.Dropout(dropRate if dropout else 0.0),
+
+        tf.keras.layers.Conv2D(64,
+                               kernel_size=(3, 3),
+                               activation=tf.nn.relu),
+        tf.keras.layers.Conv2D(64,
+                               kernel_size=(2, 2),
+                               activation=tf.nn.relu),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.MaxPool2D(pool_size=(2, 2)),
+
         tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(256, activation=tf.nn.relu),
+        tf.keras.layers.Dense(128, activation=tf.nn.relu),
+
         tf.keras.layers.Dense(NUM_CLASSES, activation=tf.nn.softmax)
     ])
 
     def scheduler(epoch, lr):
         if epoch < 3:
-            return lr
-        elif epoch < 6:
-            return 0.005
-        return 0.001
+            return 0.001
+        elif epoch < 5:
+            return 0.0005
+        elif epoch < 7:
+            return 0.0001
+        elif epoch < 9:
+            return 0.00005
+        return 0.00001
 
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.01), loss='categorical_crossentropy',
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.005), loss='categorical_crossentropy',
                   metrics=['accuracy'])
     reduce_lr = tf.keras.callbacks.LearningRateScheduler(scheduler)
-    model.fit(x, y, epochs=eps, callbacks=[reduce_lr], batch_size=256)
+    model.fit(x, y, epochs=eps, callbacks=[reduce_lr], batch_size=64)
     return model
 
 
@@ -106,11 +133,14 @@ def getRawData():
         mnist = tf.keras.datasets.fashion_mnist
         (xTrain, yTrain), (xTest, yTest) = mnist.load_data()
     elif DATASET == "cifar_10":
-        pass  # TODO: Add this case.
+        cifar = tf.keras.datasets.cifar10
+        (xTrain, yTrain), (xTest, yTest) = cifar.load_data()
     elif DATASET == "cifar_100_f":
-        pass  # TODO: Add this case.
+        cifar = tf.keras.datasets.cifar100
+        (xTrain, yTrain), (xTest, yTest) = cifar.load_data(label_mode='fine')
     elif DATASET == "cifar_100_c":
-        pass  # TODO: Add this case.
+        cifar = tf.keras.datasets.cifar100
+        (xTrain, yTrain), (xTest, yTest) = cifar.load_data(label_mode='coarse')
     else:
         raise ValueError("Dataset not recognized.")
     print("Dataset: %s" % DATASET)
@@ -131,6 +161,8 @@ def preprocessData(raw):
         xTestP = xTest.reshape((xTest.shape[0], IH, IW, IZ))
     yTrainP = to_categorical(yTrain, NUM_CLASSES)
     yTestP = to_categorical(yTest, NUM_CLASSES)
+    xTrainP = xTrainP / 255.
+    xTestP = xTestP / 255.
     print("New shape of xTrain dataset: %s." % str(xTrainP.shape))
     print("New shape of xTest dataset: %s." % str(xTestP.shape))
     print("New shape of yTrain dataset: %s." % str(yTrainP.shape))
@@ -184,6 +216,7 @@ def evalResults(data, preds):
     print("Classifier algorithm: %s" % ALGORITHM)
     print("Classifier accuracy: %f%%" % (accuracy * 100))
     print()
+    return accuracy * 100
 
 
 # =========================<Main>================================================
@@ -195,6 +228,78 @@ def main():
     preds = runModel(data[1][0], model)
     evalResults(data[1], preds)
 
+def runAlg():
+  global NUM_CLASSES
+  global IH
+  global IW
+  global IZ
+  global IS
+  if DATASET == "mnist_d":
+      NUM_CLASSES = 10
+      IH = 28
+      IW = 28
+      IZ = 1
+      IS = 784
+  elif DATASET == "mnist_f":
+      NUM_CLASSES = 10
+      IH = 28
+      IW = 28
+      IZ = 1
+      IS = 784
+  elif DATASET == "cifar_10":
+      NUM_CLASSES = 10
+      IH = 32
+      IW = 32
+      IZ = 3
+      IS = 3072
+  elif DATASET == "cifar_100_f":
+      NUM_CLASSES = 100
+      IH = 32
+      IW = 32
+      IZ = 3
+      IS = 3072
+  elif DATASET == "cifar_100_c":
+      NUM_CLASSES = 20
+      IH = 32
+      IW = 32
+      IZ = 3
+      IS = 3072
+  raw = getRawData()
+  data = preprocessData(raw)
+  model = trainModel(data[0])
+  preds = runModel(data[1][0], model)
+  return evalResults(data[1], preds)
 
 if __name__ == '__main__':
-    main()
+    # main()
+    df = {}
+    for i in ["tf_net", "tf_conv"]:
+        global ALGORITHM
+        ALGORITHM = i
+        df1 = {}
+        for j in ["mnist_d", "mnist_f", "cifar_10", "cifar_100_f", "cifar_100_c"]:
+            global DATASET
+            DATASET = j
+            df1[j] = runAlg()
+        df[i] = df1
+    print(df)
+
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(6, 6))
+    plt.bar(df['tf_conv'].keys(), df['tf_conv'].values())
+    plt.title("Conv Net Results")
+    plt.xlabel("Dataset")
+    plt.ylabel("Accuracy")
+    plt.show()
+
+    plt.savefig('CNN_Accuracy_Plot.pdf')
+
+    plt.figure(figsize=(6, 6))
+    plt.bar(df['tf_net'].keys(), df['tf_net'].values())
+    plt.title("ANN Net Results")
+    plt.xlabel("Dataset")
+    plt.ylabel("Accuracy")
+    plt.show()
+
+    plt.savefig('ANN_Accuracy_Plot.pdf')
